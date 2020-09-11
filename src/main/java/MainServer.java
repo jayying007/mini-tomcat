@@ -21,51 +21,46 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class MainServer {
     private int port = 8080;
     private final Logger logger = LoggerFactory.getLogger(MainServer.class);
+    private ServerSocket serverSocket;
+    private Request request;
+    private Response response;
+    private ExecutorService fixedThreadPool;
 
     public MainServer() {
-        ServerSocket serverSocket = null;
-
         try {
             serverSocket = new ServerSocket(this.port);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        fixedThreadPool = Executors.newFixedThreadPool(4);
+    }
+    public MainServer(int port) {
+        this();
+        this.port = port;
+    }
+    public void start() {
+        try {
             while (true) {
-                logger.info("准备提供服务...");
-                Socket socket = serverSocket.accept();//调用该方法后进程会阻塞，直到有主机连接
-                logger.info(String.format("接收新的服务： %s %d", socket.getInetAddress(), socket.getPort()));
+                logger.info("启动成功，监听端口 " + this.port);
+                final Socket socket = serverSocket.accept();//调用该方法后进程会阻塞，直到有主机连接
 
-                InputStream inputStream = socket.getInputStream();
-
-                String requestData = "";
-                byte[] requestBytes = new byte[1024];
-                int length = 0;
-                if((length = inputStream.read(requestBytes)) > 0) {
-                    requestData = new String(requestBytes, 0, length);
-                }
-                System.out.println(requestData);
-
-
-                StringBuilder responseData = new StringBuilder();
-                responseData.append("HTTP/1.1 200 OK\n")
-                        .append("Content-Type: text/html\n")
-                        .append("\r\n")
-                        .append("<html><body>")
-                        .append("Hello world")
-                        .append("</body></html>");
-                try {
-                    //every request cost
-                    TimeUnit.MILLISECONDS.sleep(10);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                OutputStream outputStream = socket.getOutputStream();
-                outputStream.write(responseData.toString().getBytes());
-                outputStream.close();
-
-                socket.close();
+                fixedThreadPool.submit(new Runnable() {
+                    public void run() {
+                        try {
+                            System.out.println(Thread.currentThread().getName());
+                            handler(socket);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -76,6 +71,30 @@ public class MainServer {
                 e.printStackTrace();
             }
         }
+    }
+    public void handler(Socket socket) throws IOException {
+        logger.info(String.format("接收新的服务： %s %d", socket.getInetAddress(), socket.getPort()));
 
+        this.request = new Request(socket.getInputStream());
+        this.response = new Response(socket.getOutputStream());
+
+        try {
+            //every request cost
+            TimeUnit.MILLISECONDS.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        OutputStream outputStream = response.getOutputStream();
+
+        String responseData = "HTTP/1.1 200 OK\n" +
+                "Content-Type: text/html\n" +
+                "\r\n" +
+                "<html><body>" +
+                "Hello world" +
+                "</body></html>";
+        outputStream.write(responseData.getBytes());
+
+        socket.close();
     }
 }

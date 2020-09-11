@@ -14,9 +14,17 @@
  * limitations under the License.
  */
 
-public class TestServer {
-    public static void main(String[] args) {
-        MainServer server = new MainServer();
-        server.start();
+import java.io.OutputStream;
+
+public class Response {
+    private OutputStream outputStream;
+
+    public Response(OutputStream outputStream) {
+        this.outputStream = outputStream;
+    }
+
+
+    public OutputStream getOutputStream() {
+        return this.outputStream;
     }
 }
